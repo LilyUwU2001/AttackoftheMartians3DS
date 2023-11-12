@@ -5,10 +5,10 @@ function draw_bg()
 end
 	
 function draw_map()
-	offset_x = (map_x % tile_w) - 16
-	offset_y = (map_y % tile_h) - 16
-	firstTile_x = math.floor(map_x / tile_w)
-	firstTile_y = math.floor(map_y / tile_h)
+	offset_x = (math.floor(map_x) % tile_w) - 16
+	offset_y = (math.floor(map_y) % tile_h) - 16
+	firstTile_x = math.floor(math.floor(map_x) / tile_w)
+	firstTile_y = math.floor(math.floor(map_y) / tile_h)
 	
 	for y=1, (map_display_h + map_display_buffer) do
 		for x=1, (map_display_w + map_display_buffer) do
@@ -49,9 +49,6 @@ function scroll_map(dt)
 	end
     if map_y < target_map_y then
 		map_y = map_y + speed
-	end
-	if Joystick:isGamepadDown( "start" ) then
-		love.event.quit()
 	end
 
 	-- check boundaries. remove this section if you don't wish to be constrained to the map.

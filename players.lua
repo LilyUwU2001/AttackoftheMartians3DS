@@ -23,6 +23,7 @@ function spawn_player(x,y)
     p.moveRight = 0
     p.jumpKey = 0
     p.shootKey = 0
+    p.pauseKey = 0
 	add(players, p)
     target_map_x = p.x - 175
     target_map_y = p.y - 60
@@ -45,8 +46,9 @@ function update_player(self, dt)
         health = 100
         lives = lives - 1
         TEsound.play(snd_death, "sfx")
-        reinit_stages()
-        initialize_stage()
+        new_stagenum = stagenum
+        start_trans()
+        game_state = STATE_CHANGELVL
     end
 
     self.speed = (5*60*dt)/2
@@ -101,6 +103,12 @@ function update_player(self, dt)
             self.shootTimer = 0
         end
         aKey = 0
+    end
+    if selectKey == 1 or startKey == 1 then
+        TEsound.play(snd_konamipause, "sfx")
+        selectKey = 0
+        startKey = 0
+        game_state = STATE_PAUSED
     end
     if health <= 0 then
         health = 100
@@ -171,4 +179,11 @@ end
 function draw_playerbullet_collider(self)
     love.graphics.setColor( 0, 1, 0, 1 )
 	love.graphics.rectangle("fill", self.x - offset_x - firstTile_x * 32, self.y - offset_y - firstTile_y * 32, 8, 8)
+end
+
+function check_gameover()
+    if lives <= 0 then
+        start_trans()
+        game_state = STATE_GAMETOGOVER
+    end
 end

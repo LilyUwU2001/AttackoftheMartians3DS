@@ -75,6 +75,10 @@ function update_martian(self, dt)
             TEsound.play(snd_tarcza, "sfx")
             self.isDead = 0
         end
+        if self.t == 4 then
+            start_trans()
+            game_state = STATE_GAMETOEND
+        end
     end
 	if self.t == 0 then
         self.speed = (192*dt)/2

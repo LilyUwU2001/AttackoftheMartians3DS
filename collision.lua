@@ -152,9 +152,9 @@ function check_powerup_player_collisions(dt)
                     end
                 end
                 if pu.t >= 4 then
-                    stagenum = stagenum + 1
-                    reinit_stages()
-                    initialize_stage()
+                    new_stagenum = stagenum + 1
+                    start_trans()
+                    game_state = STATE_CHANGELVL
                 end
             end
         end

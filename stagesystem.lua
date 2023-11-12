@@ -189,7 +189,19 @@ function initialize_stage()
                             -- Otherwise, the tiles will just pop into view, and we don't want that.
 
     -- play music for levels
+    if music_title:isPlaying() == true then
+        music_title:stop()
+    end
+    if music_ending:isPlaying() == true then
+        music_ending:stop()
+    end
+    if music_gover:isPlaying() == true then
+        music_gover:stop()
+    end
     if stagenum >= 1 and stagenum <= 4 then
+        if music4:isPlaying() == true then
+            music4:stop()
+        end
         if music1:isPlaying() == false then
             music1:setLooping(true)
 	        music1:play()

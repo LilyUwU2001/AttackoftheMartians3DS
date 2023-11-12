@@ -38,6 +38,9 @@ function love.gamepadpressed(joystick, button)
     if tostring(button) == "back" then
         selectKey = 1
     end
+    if tostring(button) == "select" then
+        selectKey = 1
+    end
     if tostring(button) == "start" then
         startKey = 1
     end
@@ -76,6 +79,9 @@ function love.gamepadreleased(joystick, button)
         yKey = 0
     end
     if tostring(button) == "back" then
+        selectKey = 0
+    end
+    if tostring(button) == "select" then
         selectKey = 0
     end
     if tostring(button) == "start" then

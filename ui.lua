@@ -18,11 +18,20 @@ function draw_lives()
 end
 
 function draw_healthbar()
-    love.graphics.setColor( 0.0, 0.0, 0.0, 1 )
-	love.graphics.rectangle("fill", 16,48, 112,16)
-	love.graphics.setColor( 1, 0, 0, 1 )
-    love.graphics.rectangle("fill", 17,49, 110*health/100,14)
-    love.graphics.setColor( 1, 1, 1, 1 )
+    if lives > 0 then
+        love.graphics.setColor( 0.0, 0.0, 0.0, 1 )
+        love.graphics.rectangle("fill", 16,48, 112,16)
+        love.graphics.setColor( 1, 0, 0, 1 )
+        love.graphics.rectangle("fill", 17,49, 110*health/100,14)
+        love.graphics.setColor( 1, 1, 1, 1 )
+    end
+    if lives <= 0 then
+        love.graphics.setColor( 0.0, 0.0, 0.0, 1 )
+        love.graphics.rectangle("fill", 16,48, 112,16)
+        love.graphics.setColor( 1, 0, 0, 1 )
+        love.graphics.rectangle("fill", 17,49, 110*0/100,14)
+        love.graphics.setColor( 1, 1, 1, 1 )
+    end
 end
 
 function draw_mappos()

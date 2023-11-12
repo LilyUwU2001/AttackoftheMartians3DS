@@ -1,9 +1,12 @@
---require('nest'):init({mode = "ctr", scale = 1, emulateJoystick = true})
+require('nest'):init({mode = "ctr", scale = 1, emulateJoystick = true})
 require('pico8')
-require('TEsound')
+require('tesound')
 require('input')
 
 require('stagesystem')
+require('statesystem')
+require('trans_general')
+require('changelvl_state')
 
 require('map')
 require('decors')
@@ -13,6 +16,12 @@ require('powerups')
 require('ui')
 
 require('collision')
+
+require('menu')
+require('ending')
+require('pause')
+
+require('drawgame')
 
 function love.load()
 	-- debug flag
@@ -48,6 +57,7 @@ function love.load()
 
 	-- Atak Marsjanów logo
 	amlogo = love.graphics.newImage("graphics/amlogo.png")
+	gameover = love.graphics.newImage("graphics/gameover.png")
 
 	-- Martian graphics
 	martianGraphics = {}
@@ -84,6 +94,16 @@ function love.load()
 	powerupGraphics[8] = love.graphics.newImage("graphics/sign_stage7.png")
 	powerupGraphics[9] = love.graphics.newImage("graphics/sign_stage8.png")
 
+	-- Ending graphics
+	endingBase = love.graphics.newImage("graphics/ending_base.png")
+	endingCredits = love.graphics.newImage("graphics/ending_credits.png")
+
+	-- Menu graphics
+	menuNewGameBtn = love.graphics.newImage("graphics/new_game.png")
+	menuExitBtn = love.graphics.newImage("graphics/exit.png")
+	menuContinueBtn = love.graphics.newImage("graphics/continue.png")
+	menuEndGameBtn = love.graphics.newImage("graphics/endgame.png")
+	
 	-- Assorted sounds
 	snd_marsDeath = love.sound.newSoundData("sound/marsdeath.wav")
 	snd_tarcza = love.sound.newSoundData("sound/tarcza.wav")
@@ -91,6 +111,8 @@ function love.load()
 	snd_death = love.sound.newSoundData("sound/death.wav")
 	snd_apteczka = love.sound.newSoundData("sound/apteczka.wav")
 	snd_zycie = love.sound.newSoundData("sound/zycie.wav")
+	snd_select = love.sound.newSoundData("sound/select.wav")
+	snd_konamipause = love.sound.newSoundData("sound/konamipause.wav")
 
 	-- current stage variable
 	stagenum = 1
@@ -101,6 +123,13 @@ function love.load()
 	tile_w = 32
 	tile_h = 32
 
+	-- last tap
+	tapx = 0
+	tapy = 0
+
+	-- is continuing?
+	continue = 0
+
 	-- sound variables
 	hit_sound = 4 -- variable for hit sound loop
 
@@ -109,7 +138,10 @@ function love.load()
 	music2 = love.audio.newSource("music/music2.ogg", "stream") -- the "stream" tells LÖVE to stream the file from disk, good for longer music tracks
 	music3 = love.audio.newSource("music/music3.ogg", "stream") -- the "stream" tells LÖVE to stream the file from disk, good for longer music tracks
 	music4 = love.audio.newSource("music/music4.ogg", "stream") -- the "stream" tells LÖVE to stream the file from disk, good for longer music tracks
-
+	music_ending = love.audio.newSource("music/music_ending.ogg", "stream") -- the "stream" tells LÖVE to stream the file from disk, good for longer music tracks
+	music_title = love.audio.newSource("music/music_title.ogg", "stream") -- the "stream" tells LÖVE to stream the file from disk, good for longer music tracks
+	music_gover = love.audio.newSource("music/music_gover.ogg", "stream") -- the "stream" tells LÖVE to stream the file from disk, good for longer music tracks
+	
 	-- player data
 	score = 0
 	lives = 10
@@ -133,40 +165,365 @@ function love.load()
 	leftShoulderKey = 0
 	rightShoulderKey = 0
 
-	initialize_stage()
+	-- transition variables
+	trans_val = 0
+	trans_direction = 0
+
+	-- current game state variable
+	game_state = STATE_MENU
+
+	initialize_menu()
+	--initialize_stage()
+	--initialize_ending()
 end
 
 function love.update(dt)
 	TEsound.cleanup()
-	scroll_map(dt)
-	update_martians(dt)
-	update_martianbullets(dt)
-	update_players(dt)
-	update_playerbullets(dt)
-	check_all_collisions(dt)
-end
-
-function love.draw(screen)
-	if screen == "left" then
-		draw_bg()
-		draw_map()
-		draw_decors()
-		draw_martians()
-		draw_martianbullets()
-		draw_players()
-		draw_playerbullets()
-		draw_powerups()
-		if DEBUG_FLAG == 1 then
-		draw_colliders()
-		draw_sprite_colliders()
+	if game_state == STATE_GAME then
+		scroll_map(dt)
+		update_martians(dt)
+		update_martianbullets(dt)
+		update_players(dt)
+		update_playerbullets(dt)
+		check_all_collisions(dt)
+		check_gameover()
+	end
+	if game_state == STATE_CHANGELVL then
+		scroll_map(dt)
+		if trans_direction == 0 then
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+		if trans_direction == 1 then
+			update_trans(dt, STATE_GAME)
 		end
 	end
-	if screen == "bottom" then
-		draw_uibg()
-		draw_score()
-		draw_lives()
-		draw_healthbar()
-		draw_mappos()
-		draw_logo()
+	if game_state == STATE_TRANS_STUB then
+		start_trans()
+		game_state = stub_prev_state
+	end
+	if game_state == STATE_DETRANS_STUB then
+		start_detrans()
+		if stub_prev_state == STATE_CHANGELVL then
+			load_stage_after_trans()
+		end
+		if stub_prev_state == STATE_MENUTOGAME then
+			load_stage_after_trans()
+		end
+		if stub_prev_state == STATE_ENDTOCRE then
+			ending_bg = endingCredits
+		end
+		if stub_prev_state == STATE_GAMETOEND then
+			initialize_ending()
+		end
+		if stub_prev_state == STATE_MENUTOEXIT then
+			love.event.quit() 
+		end
+		if stub_prev_state == STATE_MENUTOGAME then
+			initialize_game()
+		end
+		if stub_prev_state == STATE_GAMETOGOVER then
+			initialize_gover()
+		end
+		if stub_prev_state == STATE_GOVERTOGAME then
+			initialize_game_continue()
+		end
+		if stub_prev_state == STATE_GOVERTOMENU then
+			initialize_menu()
+		end
+		if stub_prev_state == STATE_ENDINGTOMENU then
+			initialize_menu()
+		end
+		game_state = stub_prev_state
+	end
+	if game_state == STATE_ENDING then
+		update_ending(dt)
+	end
+	if game_state == STATE_ENDTOCRE then
+		if trans_direction == 0 then
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+		if trans_direction == 1 then
+			update_trans(dt, STATE_ENDING)
+		end
+	end
+	if game_state == STATE_CREDITS then
+		update_ending(dt)
+	end
+	if game_state == STATE_GAMETOEND then
+		scroll_map(dt)
+		if trans_direction == 0 then
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+		if trans_direction == 1 then
+			update_trans(dt, STATE_ENDING)
+		end
+	end
+	if game_state == STATE_MENU then
+		update_menu()
+	end
+	if game_state == STATE_MENUTOGAME then
+		if trans_direction == 0 then
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+		if trans_direction == 1 then
+			update_trans(dt, STATE_GAME)
+			scroll_map(dt)
+		end
+	end
+	if game_state == STATE_MENUTOEXIT then
+		if trans_direction == 0 then
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+	end
+	if game_state == STATE_GOVER then
+		update_gover()
+	end
+	if game_state == STATE_GAMETOGOVER then
+		if trans_direction == 0 then
+			scroll_map(dt)
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+		if trans_direction == 1 then
+			update_trans(dt, STATE_GOVER)
+		end
+	end
+	if game_state == STATE_GOVERTOGAME then
+		if trans_direction == 0 then
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+		if trans_direction == 1 then
+			update_trans(dt, STATE_GAME)
+			scroll_map(dt)
+		end
+	end
+	if game_state == STATE_GOVERTOMENU then
+		if trans_direction == 0 then
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+		if trans_direction == 1 then
+			update_trans(dt, STATE_MENU)
+		end
+	end
+	if game_state == STATE_ENDINGTOMENU then
+		if trans_direction == 0 then
+			update_trans(dt, STATE_DETRANS_STUB)
+		end
+		if trans_direction == 1 then
+			update_trans(dt, STATE_MENU)
+		end
+	end
+	if game_state == STATE_PAUSED then
+		update_pause(dt)
+	end
+end
+
+function love.touchpressed(id, x, y, dx, dy, pressure)
+	tapx = x
+	tapy = y
+ end
+
+function love.draw(screen)
+	if game_state == STATE_GAME then
+		if screen == "left" then
+			draw_game_top()
+		end
+		if screen == "bottom" then
+			draw_game_bottom()
+		end
+	end
+	if game_state == STATE_CHANGELVL then
+		if screen == "left" then
+			draw_game_top()
+			draw_trans_top()
+		end
+		if screen == "bottom" then
+			draw_game_bottom()
+		end
+	end
+	if game_state == STATE_ENDING then
+		if screen == "left" then
+			draw_ending()
+		end
+		if screen == "bottom" then
+			draw_blackness()
+			draw_credits()
+		end
+	end
+	if game_state == STATE_ENDTOCRE then
+		if screen == "left" then
+			draw_ending()
+			draw_trans_top()
+		end
+		if screen == "bottom" then
+			draw_blackness()
+		end
+	end
+	if game_state == STATE_GAMETOEND then
+		if trans_direction == 0 then
+			if screen == "left" then
+				draw_game_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_game_bottom()
+				draw_trans_bottom()
+			end
+		end
+		if trans_direction == 1 then
+			if screen == "left" then
+				draw_ending()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_blackness()
+				draw_credits()
+			end
+		end
+	end
+	if game_state == STATE_MENU then
+		if screen == "left" then
+			draw_menu_top()
+		end
+		if screen == "bottom" then
+			draw_menu_bottom()
+		end
+	end
+	if game_state == STATE_MENUTOGAME then
+		if trans_direction == 0 then
+			if screen == "left" then
+				draw_menu_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_menu_bottom()
+				draw_trans_bottom()
+			end
+		end
+		if trans_direction == 1 then
+			if screen == "left" then
+				draw_game_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_game_bottom()
+				draw_trans_bottom()
+			end
+		end
+	end
+	if game_state == STATE_MENUTOEXIT then
+		if screen == "left" then
+			draw_menu_top()
+			draw_trans_top()
+		end
+		if screen == "bottom" then
+			draw_menu_bottom()
+			draw_trans_bottom()
+		end
+	end
+	if game_state == STATE_GOVER then
+		if screen == "left" then
+			draw_gover_top()
+		end
+		if screen == "bottom" then
+			draw_gover_bottom()
+		end
+	end
+	if game_state == STATE_GAMETOGOVER then
+		if trans_direction == 0 then
+			if screen == "left" then
+				draw_game_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_game_bottom()
+				draw_trans_bottom()
+			end
+		end
+		if trans_direction == 1 then
+			if screen == "left" then
+				draw_gover_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_gover_bottom()
+				draw_trans_bottom()
+			end
+		end
+	end
+	if game_state == STATE_GOVERTOGAME then
+		if trans_direction == 0 then
+			if screen == "left" then
+				draw_gover_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_gover_bottom()
+				draw_trans_bottom()
+			end
+		end
+		if trans_direction == 1 then
+			if screen == "left" then
+				draw_game_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_game_bottom()
+				draw_trans_bottom()
+			end
+		end
+	end
+	if game_state == STATE_GOVERTOMENU then
+		if trans_direction == 0 then
+			if screen == "left" then
+				draw_gover_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_gover_bottom()
+				draw_trans_bottom()
+			end
+		end
+		if trans_direction == 1 then
+			if screen == "left" then
+				draw_menu_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_menu_bottom()
+				draw_trans_bottom()
+			end
+		end
+	end
+	if game_state == STATE_ENDINGTOMENU then
+		if trans_direction == 0 then
+			if screen == "left" then
+				draw_ending()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_blackness()
+				draw_trans_bottom()
+			end
+		end
+		if trans_direction == 1 then
+			if screen == "left" then
+				draw_menu_top()
+				draw_trans_top()
+			end
+			if screen == "bottom" then
+				draw_menu_bottom()
+				draw_trans_bottom()
+			end
+		end
+	end
+	if game_state == STATE_PAUSED then
+		if screen == "left" then
+			draw_game_top()
+			draw_pause_top()
+		end
+		if screen == "bottom" then
+			draw_game_bottom()
+			draw_pause_bottom()
+		end
 	end
 end
