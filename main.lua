@@ -1,4 +1,4 @@
-require('nest'):init({mode = "ctr", scale = 1, emulateJoystick = true})
+--require('nest'):init({mode = "ctr", scale = 1, emulateJoystick = true})
 require('pico8')
 require('tesound')
 require('input')
